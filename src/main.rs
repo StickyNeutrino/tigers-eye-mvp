@@ -1,11 +1,30 @@
 use serde::Deserialize;
 use reqwest::header::AUTHORIZATION;
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Debug)]
 struct Playlist {
     id: String,
+    name: String,
+    owner: PlaylistOwner
+}
+
+#[derive(Deserialize, Debug)]
+struct PlaylistOwner {
+    display_name: String
+}
+
+#[derive(Deserialize, Debug)]
+struct PlaylistItem {
+    added_at: DateTime<Utc>,
+    track: Track
+}
+
+#[derive(Deserialize, Debug)]
+struct Track {
     name: String
 }
+
 
 fn main() {
     let token = "Bearer ...";
@@ -17,9 +36,7 @@ fn main() {
                 .build()
                 .unwrap();
 
-    let mut playlists: Vec<String> = vec![];
-
-    profiles.iter().for_each(|profile_id|{
+    let mut tracks: Vec<PlaylistItem> = profiles.iter().flat_map(|profile_id| {
         let url = format!("https://api.spotify.com/v1/users/{}/playlists", profile_id);
 
         let resp = client
@@ -31,17 +48,39 @@ fn main() {
 
 
         #[derive(Deserialize, Debug)]
-        struct PlaylistResponse {
+        struct PlaylistsResponse {
             items: Vec<Playlist>
+        }
+
+        let parsed: PlaylistsResponse = serde_json::from_str(&json).unwrap();
+
+        parsed.items
+
+    }).flat_map(|playlist| {
+        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks", playlist.id);
+
+        let resp = client
+            .get(&url)
+            .header(AUTHORIZATION, token)
+            .send().expect("Request failed");
+
+        let json = resp.text().expect("Failed to load json");
+
+
+        #[derive(Deserialize, Debug)]
+        struct PlaylistResponse {
+            items: Vec<PlaylistItem>
         }
 
         let parsed: PlaylistResponse = serde_json::from_str(&json).unwrap();
 
-        for item in parsed.items {
-            println!("{}, {}",item.name, item.id);
-        }
-    });
+        parsed.items
+    })
+    .collect();
 
+    tracks.sort_by(|a, b| a.added_at.cmp(&b.added_at));
 
-
+    for track in tracks {
+        println!("{}| name: {}", track.added_at, track.track.name);
+    }
 }
