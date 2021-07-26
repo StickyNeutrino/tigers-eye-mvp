@@ -25,62 +25,83 @@ struct Track {
     name: String
 }
 
+struct Spotify {
+    client: reqwest::blocking::Client,
+    token: String
+}
 
 fn main() {
-    let token = "Bearer ...";
+    let token = "Bearer ..."
+        .to_string();
 
-    let profiles = vec!["al5c0jlr79drnbkatho8ev5j2"];
+    let profiles = vec![""];
 
     let client = reqwest::blocking::Client::builder()
                 .https_only(true)
                 .build()
                 .unwrap();
 
-    let mut tracks: Vec<PlaylistItem> = profiles.iter().flat_map(|profile_id| {
+    let api_client = Spotify { client, token };
+
+    let mut tracks: Vec<PlaylistItem> = profiles
+        .iter()
+        .flat_map(|profile_id| {
+            api_client
+                .list_playlists(profile_id)
+                .unwrap_or_default()
+        })
+        .flat_map(|playlist| {
+            api_client
+                .items(&playlist.id)
+                .unwrap_or_default()
+        })
+        .collect();
+
+    tracks.sort_by(|a, b| a.added_at.cmp(&b.added_at));
+
+    for track in tracks {
+        println!("{}| name: {}", track.added_at, track.track.name);
+    }
+}
+
+impl Spotify {
+    fn json(&self, url: &str) -> Option<String>{
+        self.client
+            .get(url)
+            .header(AUTHORIZATION, &self.token)
+            .send()
+            .ok()?
+            .text()
+            .ok()
+    }
+
+    fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
         let url = format!("https://api.spotify.com/v1/users/{}/playlists", profile_id);
 
-        let resp = client
-            .get(&url)
-            .header(AUTHORIZATION, token)
-            .send().expect("Request failed");
-
-        let json = resp.text().expect("Failed to load json");
-
+        let json = self.json(&url)?;
 
         #[derive(Deserialize, Debug)]
         struct PlaylistsResponse {
             items: Vec<Playlist>
         }
 
-        let parsed: PlaylistsResponse = serde_json::from_str(&json).unwrap();
+        let parsed: PlaylistsResponse = serde_json::from_str(&json).ok()?;
 
-        parsed.items
+        Some(parsed.items)
+    }
 
-    }).flat_map(|playlist| {
-        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks", playlist.id);
+    fn items(& self, playlist_id: &str) -> Option<Vec<PlaylistItem>>{
+        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks", playlist_id);
 
-        let resp = client
-            .get(&url)
-            .header(AUTHORIZATION, token)
-            .send().expect("Request failed");
-
-        let json = resp.text().expect("Failed to load json");
-
+        let json = self.json(&url)?;
 
         #[derive(Deserialize, Debug)]
         struct PlaylistResponse {
             items: Vec<PlaylistItem>
         }
 
-        let parsed: PlaylistResponse = serde_json::from_str(&json).unwrap();
+        let parsed: PlaylistResponse = serde_json::from_str(&json).ok()?;
 
-        parsed.items
-    })
-    .collect();
-
-    tracks.sort_by(|a, b| a.added_at.cmp(&b.added_at));
-
-    for track in tracks {
-        println!("{}| name: {}", track.added_at, track.track.name);
+        Some(parsed.items)
     }
 }
