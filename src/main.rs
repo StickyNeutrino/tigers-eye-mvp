@@ -46,9 +46,11 @@ fn main() {
     let mut tracks: Vec<PlaylistItem> = profiles
         .iter()
         .flat_map(|profile_id| {
-            api_client
+            let ret = api_client
                 .list_playlists(profile_id)
-                .unwrap_or_default()
+                .unwrap_or_default();
+            println!("{}, {}", profile_id, ret.len());
+            ret
         })
         .flat_map(|playlist| {
             api_client
@@ -60,7 +62,7 @@ fn main() {
     tracks.sort_by(|a, b| a.added_at.cmp(&b.added_at));
 
     for track in tracks {
-        println!("{}| name: {}", track.added_at, track.track.name);
+        println!("{}, {}", track.added_at, track.track.name);
     }
 }
 
