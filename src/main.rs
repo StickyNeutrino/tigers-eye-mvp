@@ -14,10 +14,21 @@ struct PlaylistOwner {
     display_name: String
 }
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ItemType {
+    Item(PlaylistItem),
+    None(DummyItem)
+}
+
 #[derive(Deserialize, Debug)]
 struct PlaylistItem {
     added_at: DateTime<Utc>,
     track: Track
+}
+
+#[derive(Deserialize, Debug)]
+struct DummyItem {
 }
 
 #[derive(Deserialize, Debug)]
@@ -93,17 +104,29 @@ impl Spotify {
     }
 
     fn items(& self, playlist_id: &str) -> Option<Vec<PlaylistItem>>{
-        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks", playlist_id);
+        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks?market=es&fields=total", playlist_id);
 
         let json = self.json(&url)?;
 
-        #[derive(Deserialize, Debug)]
+        #[derive(Deserialize)]
+        struct SizeResponse {
+            total: u32
+        }
+        let parsed: SizeResponse = serde_json::from_str(&json).expect("fail");
+
+        let offset = if parsed.total < 100 { 0 } else { parsed.total - 100 };
+
+        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks?market=es&offset={}&fields=items(added_at.id%2Ctrack(name))", playlist_id,offset);
+
+        let json = self.json(&url)?;
+
+        #[derive(Deserialize)]
         struct PlaylistResponse {
-            items: Vec<PlaylistItem>
+            items: Vec<ItemType>,
         }
 
-        let parsed: PlaylistResponse = serde_json::from_str(&json).ok()?;
+        let parsed: PlaylistResponse = serde_json::from_str(&json).expect("fail");
 
-        Some(parsed.items)
+        Some(parsed.items.into_iter().filter_map(|i| match i { ItemType::Item(pi) => Some(pi), ItemType::None(_) => None}).collect())
     }
 }
