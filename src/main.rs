@@ -89,7 +89,7 @@ impl Spotify {
     }
 
     fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
-        let url = format!("https://api.spotify.com/v1/users/{}/playlists", profile_id);
+        let url = format!("https://api.spotify.com/v1/users/{}/playlists?limit=50", profile_id);
 
         let json = self.json(&url)?;
 
