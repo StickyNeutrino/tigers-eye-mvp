@@ -54,7 +54,7 @@ fn main() {
 
     let api_client = Spotify { client, token };
 
-    let mut tracks: Vec<PlaylistItem> = profiles
+    let scrape: Vec<(Playlist, Vec<PlaylistItem>)> = profiles
         .iter()
         .flat_map(|profile_id| {
             let ret = api_client
@@ -63,18 +63,28 @@ fn main() {
             println!("{}, {}", profile_id, ret.len());
             ret
         })
-        .flat_map(|playlist| {
-            api_client
+        .map(|playlist| {
+            let items = api_client
                 .items(&playlist.id)
-                .unwrap_or_default()
+                .unwrap_or_default();
+                
+                (playlist, items)
         })
         .collect();
 
-    tracks.sort_by(|a, b| a.added_at.cmp(&b.added_at));
-
-    for track in tracks {
-        println!("{}, {}", track.added_at, track.track.name);
-    }
+    let mut entries = scrape
+    .into_iter()
+    .flat_map(|(playlist, items)|
+    	items
+    	.into_iter()
+    	.map( move|item|(item, playlist.owner.display_name.clone(), playlist.name.clone())))
+    .collect::<Vec<(PlaylistItem, String, String)>>();
+    
+    entries.sort_by(|a, b| a.0.added_at.cmp(&b.0.added_at));
+    
+    entries.into_iter().for_each(|(track, owner, playlist)|
+    	println!("{}|{}|{}| {}", track.added_at, owner, playlist, track.track.name));
+    
 }
 
 impl Spotify {
@@ -104,7 +114,7 @@ impl Spotify {
     }
 
     fn items(& self, playlist_id: &str) -> Option<Vec<PlaylistItem>>{
-        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks?market=es&fields=total", playlist_id);
+        let url = format!("https://api.spotify.com/v1/playlists/{}/tracks?market=es&fields=total", playlist_id);
 
         let json = self.json(&url)?;
 
@@ -116,7 +126,7 @@ impl Spotify {
 
         let offset = if parsed.total < 100 { 0 } else { parsed.total - 100 };
 
-        let url = format!("	https://api.spotify.com/v1/playlists/{}/tracks?market=es&offset={}&fields=items(added_at.id%2Ctrack(name))", playlist_id,offset);
+        let url = format!("https://api.spotify.com/v1/playlists/{}/tracks?market=es&offset={}&fields=items(added_at.id%2Ctrack(name))", playlist_id,offset);
 
         let json = self.json(&url)?;
 
