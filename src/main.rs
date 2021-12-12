@@ -1,8 +1,10 @@
 mod spotify;
+use futures::future::join_all;
 
 use std::fs;
 use spotify::{ Spotify, PlaylistItem, Playlist };
 
+#[tokio::main]
 fn main() {
     let token = fs::read_to_string("token.txt")
     .expect("Token File Missing");
@@ -16,16 +18,16 @@ fn main() {
 
     let api_client = Spotify { client, token };
 
-    let scrape: Vec<(Playlist, Vec<PlaylistItem>)> = profiles
+    let playlists = profiles
         .iter()
-        .flat_map(|profile_id| {
-            let ret = api_client
-                .list_playlists(profile_id)
-                .unwrap_or_default();
-            println!("{}, {}", profile_id, ret.len());
-            ret
-        })
-        .map(|playlist| {
+        .map(|profile_id| {
+            api_client.list_playlists(profile_id)
+        });
+    
+    let scrape: Vec<(Playlist, Vec<PlaylistItem>)> = join_all(playlists).await.iter()
+        .flat_map(|playlists : &Option<Vec<Playlist>>| playlists.unwrap_or_default().as_ref())
+        .map(|playlist : Playlist| {
+            
             let items = api_client
                 .items(&playlist.id)
                 .unwrap_or_default();

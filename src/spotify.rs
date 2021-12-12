@@ -41,8 +41,6 @@ pub struct Spotify {
     pub token: String
 }
 
-
-
 impl Spotify {
     fn json(&self, url: &str) -> Option<String>{
         self.client
@@ -54,7 +52,7 @@ impl Spotify {
             .ok()
     }
 
-    pub fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
+    pub async fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
         let url = format!("https://api.spotify.com/v1/users/{}/playlists?limit=50", profile_id);
 
         let json = self.json(&url)?;
