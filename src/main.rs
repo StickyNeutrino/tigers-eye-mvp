@@ -1,5 +1,6 @@
 mod spotify;
 
+use std::fs;
 use spotify::{ Spotify, PlaylistItem, Playlist };
 
 fn main() {
