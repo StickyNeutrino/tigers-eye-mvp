@@ -2,6 +2,7 @@ use serde::Deserialize;
 use reqwest::header::AUTHORIZATION;
 use chrono::{DateTime, Utc};
 
+
 #[derive(Deserialize, Debug)]
 pub struct Playlist {
     pub id: String,
@@ -37,24 +38,27 @@ pub struct Track {
 }
 
 pub struct Spotify {
-    pub client: reqwest::blocking::Client,
+    pub client: reqwest::Client,
     pub token: String
 }
 
 
 
 impl Spotify {
-    fn json(&self, url: &str) -> Option<String>{
-        self.client
+    async fn json(&self, url: &str) -> Option<String>{
+        let text = self.client
             .get(url)
             .header(AUTHORIZATION, &self.token)
             .send()
             .ok()?
             .text()
-            .ok()
+            .ok();
+
+        //println!("{}", text.as_ref().unwrap());
+        text
     }
 
-    pub fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
+    pub async fn list_playlists(& self, profile_id: &str) -> Option<Vec<Playlist>>{
         let url = format!("https://api.spotify.com/v1/users/{}/playlists?limit=50", profile_id);
 
         let json = self.json(&url)?;
@@ -69,7 +73,7 @@ impl Spotify {
         Some(parsed.items)
     }
 
-    pub fn items(& self, playlist_id: &str) -> Option<Vec<PlaylistItem>>{
+    pub async fn items(& self, playlist_id: &str) -> Option<Vec<PlaylistItem>>{
         let url = format!("https://api.spotify.com/v1/playlists/{}/tracks?market=es&fields=total", playlist_id);
 
         let json = self.json(&url)?;
