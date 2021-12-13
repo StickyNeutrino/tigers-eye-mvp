@@ -6,6 +6,7 @@ use spotify::{ Spotify, PlaylistItem, Playlist };
 fn main() {
     let token = fs::read_to_string("token.txt")
     .expect("Token File Missing");
+    let token = format!("Bearer {}", token);
 
     let profiles = vec![""];
 
